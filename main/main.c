@@ -22,7 +22,11 @@ void print_packet_as_hex()
 
 void print_mac_address_split_by_colons(uint8_t *mac_address)
 {
-    printf("%02x:%02x:%02x:%02x:%02x:%02x", mac_address[0], mac_address[1], mac_address[2], mac_address[3], mac_address[4], mac_address[5]);
+    printf("%02x", mac_address[0]);
+    for (int i = 1; i < 6; i++)
+    {
+        printf(":%02x", mac_address[i]);
+    }
 }
 
 struct ethernet_hdr
