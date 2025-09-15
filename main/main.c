@@ -8,6 +8,8 @@
 #define ETHERNET_TYPE_LEN 2
 #define ETHER_ARP_TYPE 0x0806
 #define ETHER_IPV4_TYPE 0x0800
+#define LAYER_2_SIZE sizeof(struct ethernet_hdr)
+#define IP_ADDRESS_LEN 4
 
 #define BUFLEN 100
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
@@ -31,6 +33,17 @@ void print_mac_address_split_by_colons(uint8_t *mac_address)
     {
         printf(":%02x", mac_address[i]);
     }
+    puts("");
+}
+
+void print_ip_address_split_by_dots(uint8_t *ip_address)
+{
+    printf("%d", ip_address[0]);
+    for (int i = 1; i < 4; i++)
+    {
+        printf(".%d", ip_address[i]);
+    }
+    puts("");
 }
 
 struct ethernet_hdr
@@ -57,19 +70,56 @@ char *determine_ether_type(uint16_t ethernet_type)
     };
 }
 
+struct arp_hdr
+{
+    uint16_t hw_type;
+    uint16_t protocol_type;
+    uint8_t hw_size;
+    uint8_t protocol_size;
+    uint16_t opcode;
+    uint8_t sender_hw_addr[MAC_ADDRESS_LEN];
+    uint8_t sender_proto_addr[IP_ADDRESS_LEN];
+    uint8_t target_hw_addr[MAC_ADDRESS_LEN];
+    uint8_t target_proto_addr[IP_ADDRESS_LEN];
+};
+
+void respond_to_arp(unsigned char *packet_arp_header_ptr)
+{
+    printf("Protocol determined to be ARP\nParsing...\n");
+    struct arp_hdr *arp_header_parsed = (struct arp_hdr *)packet_arp_header_ptr;
+
+    printf("ARP Hardware type: %d\n", ntohs(arp_header_parsed->hw_type));
+
+    printf("ARP Protocol type: 0x%x\n", ntohs(arp_header_parsed->protocol_type));
+
+    printf("ARP Hardware size: %d\n", (arp_header_parsed->hw_size));
+
+    printf("ARP Protocol size: %d\n", (arp_header_parsed->protocol_size));
+
+    printf("ARP opcode: %d\n", ntohs(arp_header_parsed->opcode));
+
+    printf("ARP Sender Hardware Address: ");
+    print_mac_address_split_by_colons(arp_header_parsed->sender_hw_addr);
+    printf("ARP Sender Protocol Address: ");
+    print_ip_address_split_by_dots(arp_header_parsed->sender_proto_addr);
+
+    printf("ARP Target Hardware Address: ");
+    print_mac_address_split_by_colons(arp_header_parsed->target_hw_addr);
+
+    printf("ARP Target Protocol Address: ");
+    print_ip_address_split_by_dots(arp_header_parsed->target_proto_addr);
+}
+
 int main(int argc, char *argv[])
 {
-    char *packet_current_position_ptr;
     print_packet_as_hex();
 
     struct ethernet_hdr *eth_hdr = (struct ethernet_hdr *)EXAMPLE_PACKET;
     printf("Destination MAC: ");
     print_mac_address_split_by_colons(eth_hdr->dst_mac);
-    puts("\n");
 
     printf("Source MAC: ");
     print_mac_address_split_by_colons(eth_hdr->src_mac);
-    puts("\n");
 
     printf("Ethernet Type: %04x\n", ntohs(eth_hdr->ethernet_type));
 
@@ -79,7 +129,7 @@ int main(int argc, char *argv[])
     switch (ntohs(eth_hdr->ethernet_type))
     {
     case ETHER_ARP_TYPE:
-        /* code */
+        respond_to_arp(&(EXAMPLE_PACKET[LAYER_2_SIZE]));
         break;
     case ETHER_IPV4_TYPE:
         // code
