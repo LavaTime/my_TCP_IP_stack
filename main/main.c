@@ -10,10 +10,15 @@
 #define ETHER_IPV4_TYPE 0x0800
 #define LAYER_2_SIZE sizeof(struct ethernet_hdr)
 #define IP_ADDRESS_LEN 4
+#define ARP_REPLY_OPCODE 2
+#define ARP_ETHER_TYPE 1
 
 #define BUFLEN 100
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
-unsigned char EXAMPLE_PACKET[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xd4, 0x92, 0x5e, 0x7c, 0x3d, 0x2f, 0x8, 0x6, 0x0, 0x1, 0x8, 0x0, 0x6, 0x4, 0x0, 0x1, 0xd4, 0x92, 0x5e, 0x7c, 0x3d, 0x2f, 0xa, 0x0, 0x0, 0x7c, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xa, 0x0, 0x0, 0xd0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+unsigned char EXAMPLE_PACKET[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xd4, 0x92, 0x5e, 0x7c, 0x3d, 0x2f, 0x8, 0x6, 0x0, 0x1, 0x8, 0x0, 0x6, 0x4, 0x0, 0x1, 0xd4, 0x92, 0x5e, 0x7c, 0x3d, 0x2f, 0xa, 0x0, 0x0, 0x7c, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xa, 0x0, 0x0, 0x67, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+unsigned char MY_ETHER_ADDRESS[] = {0xB4, 0x2E, 0x99, 0xEB, 0xE9, 0x42};
+unsigned char BROADCAST_ETHER_ADDRESS[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+uint8_t MY_IP_ADDRESS[IP_ADDRESS_LEN] = {0x67, 0x00, 0x00, 0x0A};
 
 void print_packet_as_hex()
 {
@@ -83,7 +88,7 @@ struct arp_hdr
     uint8_t target_proto_addr[IP_ADDRESS_LEN];
 };
 
-void respond_to_arp(unsigned char *packet_arp_header_ptr)
+struct arp_hdr *parse_arp_layer(unsigned char *packet_arp_header_ptr)
 {
     printf("Protocol determined to be ARP\nParsing...\n");
     struct arp_hdr *arp_header_parsed = (struct arp_hdr *)packet_arp_header_ptr;
@@ -108,10 +113,53 @@ void respond_to_arp(unsigned char *packet_arp_header_ptr)
 
     printf("ARP Target Protocol Address: ");
     print_ip_address_split_by_dots(arp_header_parsed->target_proto_addr);
+    return arp_header_parsed;
+}
+
+int build_arp_response_layer(struct arp_hdr *arp_hdr_parsed, struct arp_hdr *response_arp_layer)
+{
+    if (ntohs(arp_hdr_parsed->opcode) != 1)
+    {
+        printf("Not an ARP request\n");
+        return -1;
+    }
+    if (memcmp(arp_hdr_parsed->target_proto_addr, MY_IP_ADDRESS, IP_ADDRESS_LEN) == 0)
+    {
+        printf("Target IP Address is not ours\n");
+        return -2;
+    }
+    response_arp_layer->hw_type = htons(ARP_ETHER_TYPE);
+    response_arp_layer->protocol_type = htons(ETHER_IPV4_TYPE);
+    response_arp_layer->hw_size = MAC_ADDRESS_LEN;
+    response_arp_layer->protocol_size = IP_ADDRESS_LEN;
+    response_arp_layer->opcode = htons(ARP_REPLY_OPCODE);
+
+    memcpy(&(response_arp_layer->sender_hw_addr), &MY_ETHER_ADDRESS, MAC_ADDRESS_LEN);
+    uint32_t MY_IP_ADDRESS_NETWORK = htonl(*(uint32_t *)MY_IP_ADDRESS);
+    memcpy(&(response_arp_layer->sender_proto_addr), &(MY_IP_ADDRESS_NETWORK), IP_ADDRESS_LEN);
+    memcpy(&(response_arp_layer->target_hw_addr), &(arp_hdr_parsed->sender_hw_addr), MAC_ADDRESS_LEN);
+    memcpy(&(response_arp_layer->target_proto_addr), &(arp_hdr_parsed->sender_proto_addr), IP_ADDRESS_LEN);
+    return 0;
+}
+
+void respond_to_arp(unsigned char packet_arp_header_ptr[])
+{
+    struct arp_hdr *arp_hdr_parsed = parse_arp_layer(packet_arp_header_ptr);
+
+    struct arp_hdr response_arp_layer;
+    if (build_arp_response_layer(arp_hdr_parsed, &response_arp_layer) != 0)
+    {
+        printf("Not responding to ARP\n");
+        return;
+    }
+
+    struct arp_hdr *response_arp_hdr = parse_arp_layer((unsigned char *)&response_arp_layer);
+    // struct ethernet_hdr response_ethernet_hdr;
 }
 
 int main(int argc, char *argv[])
 {
+    int exitcode;
     print_packet_as_hex();
 
     struct ethernet_hdr *eth_hdr = (struct ethernet_hdr *)EXAMPLE_PACKET;
@@ -129,7 +177,7 @@ int main(int argc, char *argv[])
     switch (ntohs(eth_hdr->ethernet_type))
     {
     case ETHER_ARP_TYPE:
-        respond_to_arp(&(EXAMPLE_PACKET[LAYER_2_SIZE]));
+        respond_to_arp(EXAMPLE_PACKET + LAYER_2_SIZE);
         break;
     case ETHER_IPV4_TYPE:
         // code
