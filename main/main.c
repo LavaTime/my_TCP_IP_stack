@@ -158,7 +158,7 @@ void respond_to_arp(unsigned char *packet_ptr)
     struct ethernet_hdr response_ethernet_hdr;
 }
 
-void respond_to_ethernet(unsigned char *packet_ptr)
+int respond_to_ethernet(unsigned char *packet_ptr)
 {
     struct ethernet_hdr *eth_hdr = (struct ethernet_hdr *)packet_ptr;
     printf("Destination MAC: ");
@@ -185,6 +185,7 @@ void respond_to_ethernet(unsigned char *packet_ptr)
         return 1;
         break;
     }
+    return 0;
 }
 
 int main(int argc, char *argv[])
