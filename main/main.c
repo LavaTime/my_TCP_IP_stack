@@ -20,13 +20,12 @@ unsigned char MY_ETHER_ADDRESS[] = {0xB4, 0x2E, 0x99, 0xEB, 0xE9, 0x42};
 unsigned char BROADCAST_ETHER_ADDRESS[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 uint8_t MY_IP_ADDRESS[IP_ADDRESS_LEN] = {0x67, 0x00, 0x00, 0x0A};
 
-void print_packet_as_hex()
+void print_packet_as_hex(unsigned char *packet, int packet_length)
 {
-    unsigned char *incoming_packet = EXAMPLE_PACKET;
     printf("Received packet: ");
-    for (int i = 0; i < sizeof(EXAMPLE_PACKET); i++)
+    for (int i = 0; i < packet_length; i++)
     {
-        printf("%02x", incoming_packet[i]);
+        printf("%02x", packet[i]);
     }
     puts("\n");
 }
@@ -191,7 +190,7 @@ void respond_to_ethernet(unsigned char *packet_ptr)
 int main(int argc, char *argv[])
 {
     int exitcode;
-    print_packet_as_hex();
+    print_packet_as_hex(EXAMPLE_PACKET, sizeof(EXAMPLE_PACKET));
 
     respond_to_ethernet(EXAMPLE_PACKET);
     return 0;
