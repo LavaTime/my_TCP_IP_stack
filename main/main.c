@@ -158,9 +158,8 @@ void respond_to_arp(unsigned char *packet_ptr)
     struct ethernet_hdr response_ethernet_hdr;
 }
 
-int respond_to_ethernet(unsigned char *packet_ptr)
+int parse_ethernet_layer(struct ethernet_hdr *eth_hdr)
 {
-    struct ethernet_hdr *eth_hdr = (struct ethernet_hdr *)packet_ptr;
     printf("Destination MAC: ");
     print_mac_address_split_by_colons(eth_hdr->dst_mac);
 
@@ -171,6 +170,14 @@ int respond_to_ethernet(unsigned char *packet_ptr)
 
     char *ether_type_name = determine_ether_type(eth_hdr->ethernet_type);
     printf("Ethernet Type: %s\n", ether_type_name);
+    return eth_hdr->ethernet_type;
+}
+
+int respond_to_ethernet(unsigned char *packet_ptr)
+{
+    struct ethernet_hdr *eth_hdr = (struct ethernet_hdr *)packet_ptr;
+
+    int ether_type = parse_ethernet_layer(eth_hdr);
 
     switch (ntohs(eth_hdr->ethernet_type))
     {
