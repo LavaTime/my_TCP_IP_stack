@@ -142,8 +142,10 @@ int build_arp_response_layer(struct arp_hdr *arp_hdr_parsed, struct arp_hdr *res
     return 0;
 }
 
-void respond_to_arp(unsigned char packet_arp_header_ptr[])
+void respond_to_arp(unsigned char *packet_ptr)
 {
+    unsigned char *packet_arp_header_ptr = &packet_ptr[LAYER_2_SIZE];
+
     struct arp_hdr *arp_hdr_parsed = parse_arp_layer(packet_arp_header_ptr);
 
     struct arp_hdr response_arp_layer;
@@ -154,15 +156,12 @@ void respond_to_arp(unsigned char packet_arp_header_ptr[])
     }
 
     struct arp_hdr *response_arp_hdr = parse_arp_layer((unsigned char *)&response_arp_layer);
-    // struct ethernet_hdr response_ethernet_hdr;
+    struct ethernet_hdr response_ethernet_hdr;
 }
 
-int main(int argc, char *argv[])
+void respond_to_ethernet(unsigned char *packet_ptr)
 {
-    int exitcode;
-    print_packet_as_hex();
-
-    struct ethernet_hdr *eth_hdr = (struct ethernet_hdr *)EXAMPLE_PACKET;
+    struct ethernet_hdr *eth_hdr = (struct ethernet_hdr *)packet_ptr;
     printf("Destination MAC: ");
     print_mac_address_split_by_colons(eth_hdr->dst_mac);
 
@@ -177,7 +176,7 @@ int main(int argc, char *argv[])
     switch (ntohs(eth_hdr->ethernet_type))
     {
     case ETHER_ARP_TYPE:
-        respond_to_arp(EXAMPLE_PACKET + LAYER_2_SIZE);
+        respond_to_arp(EXAMPLE_PACKET);
         break;
     case ETHER_IPV4_TYPE:
         // code
@@ -187,6 +186,13 @@ int main(int argc, char *argv[])
         return 1;
         break;
     }
+}
 
+int main(int argc, char *argv[])
+{
+    int exitcode;
+    print_packet_as_hex();
+
+    respond_to_ethernet(EXAMPLE_PACKET);
     return 0;
 }
