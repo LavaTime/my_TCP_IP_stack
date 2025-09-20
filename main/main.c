@@ -141,7 +141,7 @@ int build_arp_response_layer(struct arp_hdr *arp_hdr_parsed, struct arp_hdr *res
     return 0;
 }
 
-void respond_to_arp(unsigned char *packet_ptr)
+struct arp_hdr respond_to_arp(unsigned char *packet_ptr)
 {
     unsigned char *packet_arp_header_ptr = &packet_ptr[LAYER_2_SIZE];
 
@@ -155,7 +155,7 @@ void respond_to_arp(unsigned char *packet_ptr)
     }
 
     struct arp_hdr *response_arp_hdr = parse_arp_layer((unsigned char *)&response_arp_layer);
-    struct ethernet_hdr response_ethernet_hdr;
+    return *response_arp_hdr;
 }
 
 int parse_ethernet_layer(struct ethernet_hdr *eth_hdr)
@@ -173,16 +173,36 @@ int parse_ethernet_layer(struct ethernet_hdr *eth_hdr)
     return eth_hdr->ethernet_type;
 }
 
+int build_ethernet_response_layer(struct ethernet_hdr *received_ethernet_hdr, struct ethernet_hdr *response_ethernet_layer, uint16_t ethertype)
+{
+    if (!memcmp(received_ethernet_hdr->dst_mac, BROADCAST_ETHER_ADDRESS, sizeof(MAC_ADDRESS_LEN)))
+    {
+        memcpy(&(response_ethernet_layer->src_mac), &MY_ETHER_ADDRESS, MAC_ADDRESS_LEN);
+    }
+    else
+    {
+        memcpy(&(response_ethernet_layer->src_mac), &(received_ethernet_hdr->dst_mac),
+               MAC_ADDRESS_LEN);
+    }
+    memcpy(&(response_ethernet_layer->dst_mac), &(received_ethernet_hdr->src_mac), MAC_ADDRESS_LEN);
+
+    response_ethernet_layer->ethernet_type = ethertype;
+    return 0;
+}
+
 int respond_to_ethernet(unsigned char *packet_ptr)
 {
-    struct ethernet_hdr *eth_hdr = (struct ethernet_hdr *)packet_ptr;
+    struct ethernet_hdr *received_eth_hdr = (struct ethernet_hdr *)packet_ptr;
 
-    int ether_type = parse_ethernet_layer(eth_hdr);
+    int ether_type = parse_ethernet_layer(received_eth_hdr);
 
-    switch (ntohs(eth_hdr->ethernet_type))
+    unsigned char response_layer_3[1500 - LAYER_2_SIZE];
+    switch (ntohs(received_eth_hdr->ethernet_type))
     {
     case ETHER_ARP_TYPE:
-        respond_to_arp(EXAMPLE_PACKET);
+        struct arp_hdr response_arp_layer;
+        response_arp_layer = respond_to_arp(EXAMPLE_PACKET);
+        memcpy(response_layer_3, &response_arp_layer, sizeof(struct arp_hdr));
         break;
     case ETHER_IPV4_TYPE:
         // code
@@ -192,6 +212,16 @@ int respond_to_ethernet(unsigned char *packet_ptr)
         return 1;
         break;
     }
+
+    // VVV Consider modifying from using an Out parameter to returning
+    struct ethernet_hdr response_ethernet_layer;
+    build_ethernet_response_layer(received_eth_hdr, &response_ethernet_layer, ether_type);
+
+    unsigned char response_packet[64];
+
+    memcpy(response_packet, &response_ethernet_layer, LAYER_2_SIZE);
+    memcpy(response_packet + LAYER_2_SIZE, &response_layer_3, sizeof(struct arp_hdr));
+    print_packet_as_hex(response_packet, LAYER_2_SIZE + sizeof(struct arp_hdr));
     return 0;
 }
 
